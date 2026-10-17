@@ -38,6 +38,24 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Verify Azure subscription and ML provider
+        run: |
+          az account show \
+            --query "{subscription:id,tenant:tenantId,name:name}" \
+            --output table
+
+          PROVIDER_STATE=$(az provider show \
+            --namespace Microsoft.MachineLearningServices \
+            --query registrationState \
+            --output tsv)
+
+          echo "Microsoft.MachineLearningServices registration state: $PROVIDER_STATE"
+
+          if [ "$PROVIDER_STATE" != "Registered" ]; then
+            echo "Microsoft.MachineLearningServices is not registered in the authenticated subscription." >&2
+            exit 1
+          fi
+
       - name: Install Azure ML CLI
         run: |
           az extension add -n ml -y

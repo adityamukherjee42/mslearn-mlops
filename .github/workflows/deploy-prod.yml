@@ -74,18 +74,28 @@ jobs:
             exit 1
           fi
 
-          WORKSPACE_PROVIDER_STATE=$(az provider show \
-            --subscription "$WORKSPACE_SUBSCRIPTION" \
-            --namespace Microsoft.MachineLearningServices \
-            --query registrationState \
-            --output tsv)
+          REQUIRED_PROVIDERS=(
+            Microsoft.MachineLearningServices
+            Microsoft.Storage
+            Microsoft.ContainerRegistry
+            Microsoft.KeyVault
+            Microsoft.Network
+          )
 
-          echo "Workspace subscription ML provider state: $WORKSPACE_PROVIDER_STATE"
+          for PROVIDER in "${REQUIRED_PROVIDERS[@]}"; do
+            PROVIDER_STATE=$(az provider show \
+              --subscription "$WORKSPACE_SUBSCRIPTION" \
+              --namespace "$PROVIDER" \
+              --query registrationState \
+              --output tsv)
 
-          if [ "$WORKSPACE_PROVIDER_STATE" != "Registered" ]; then
-            echo "Microsoft.MachineLearningServices is not registered on the workspace subscription." >&2
-            exit 1
-          fi
+            echo "$PROVIDER registration state: $PROVIDER_STATE"
+
+            if [ "$PROVIDER_STATE" != "Registered" ]; then
+              echo "$PROVIDER is not registered on the workspace subscription." >&2
+              exit 1
+            fi
+          done
 
           # unique, deterministic, region-safe name
           SUFFIX="${WS_NAME#mlw-ai300-l}"

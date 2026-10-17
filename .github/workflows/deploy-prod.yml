@@ -57,7 +57,35 @@ jobs:
             exit 1
           fi
 
-          SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+          WORKSPACE_ID=$(az ml workspace show \
+            --name "$WS_NAME" \
+            --resource-group "$RG_NAME" \
+            --query id \
+            --output tsv)
+
+          WORKSPACE_SUBSCRIPTION=$(echo "$WORKSPACE_ID" | cut -d/ -f3)
+          CURRENT_SUBSCRIPTION=$(az account show --query id -o tsv)
+
+          echo "Authenticated subscription: $CURRENT_SUBSCRIPTION"
+          echo "Workspace subscription:     $WORKSPACE_SUBSCRIPTION"
+
+          if [ "$CURRENT_SUBSCRIPTION" != "$WORKSPACE_SUBSCRIPTION" ]; then
+            echo "The authenticated subscription does not contain the detected Azure ML workspace." >&2
+            exit 1
+          fi
+
+          WORKSPACE_PROVIDER_STATE=$(az provider show \
+            --subscription "$WORKSPACE_SUBSCRIPTION" \
+            --namespace Microsoft.MachineLearningServices \
+            --query registrationState \
+            --output tsv)
+
+          echo "Workspace subscription ML provider state: $WORKSPACE_PROVIDER_STATE"
+
+          if [ "$WORKSPACE_PROVIDER_STATE" != "Registered" ]; then
+            echo "Microsoft.MachineLearningServices is not registered on the workspace subscription." >&2
+            exit 1
+          fi
 
           # unique, deterministic, region-safe name
           SUFFIX="${WS_NAME#mlw-ai300-l}"
@@ -65,7 +93,7 @@ jobs:
 
           echo "resource_group=$RG_NAME" >> "$GITHUB_OUTPUT"
           echo "workspace=$WS_NAME" >> "$GITHUB_OUTPUT"
-          echo "subscription_id=$SUBSCRIPTION_ID" >> "$GITHUB_OUTPUT"
+          echo "subscription_id=$WORKSPACE_SUBSCRIPTION" >> "$GITHUB_OUTPUT"
           echo "endpoint_name=$ENDPOINT_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Deploy model to managed online endpoint
